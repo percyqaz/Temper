@@ -3,6 +3,16 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <PackageProjectUrl>https://github.com/percyqaz/Temper</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/percyqaz/Temper</RepositoryUrl>
+    <Version>0.1.0</Version>
+    <AssemblyVersion></AssemblyVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <Tailcalls>True</Tailcalls>
+    <Optimize>True</Optimize>
   </PropertyGroup>
 
   <ItemGroup>
