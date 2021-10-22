@@ -192,12 +192,21 @@ module Template =
             
     type Reader = Parser<unit, Vars>
     module Reader =
-        
+
+        let private pstringAllowNewline (str: string) =
+            let parts = str.Split("\n") |> List.ofArray
+            let rec f xs : Parser<unit, _> =
+                match xs with
+                | x :: y :: xs -> skipString x .>> pchar '\n' .>> f (y :: xs)
+                | x :: [] -> skipString x
+                | [] -> failwith "impossible"
+            f parts >>% str
+
         let build (template: Template) =
 
             let rec matchParser (m: Match) : Parser<string, Vars> =
                 match m with
-                | Match.Variable v -> getUserState >>= (Map.find v >> pstring)
+                | Match.Variable v -> getUserState >>= (Map.find v >> pstringAllowNewline)
                 | Match.Exact s -> pstring s
                 | Match.CaseInsensitive s -> pstringCI s
                 | Match.Whitespace _ -> skipped spaces
@@ -206,7 +215,7 @@ module Template =
             
             let fragParser (frag: TemplateFragment) : Parser<unit, Vars> =
                 match frag with
-                | Raw s -> skipString s
+                | Raw s -> pstringAllowNewline s >>% ()
                 | Discard m -> matchParser m >>% ()
                 | Variable (v, m) -> matchParser m >>= (fun x -> updateUserState (Map.add v x))
 

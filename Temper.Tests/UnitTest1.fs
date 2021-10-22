@@ -14,7 +14,7 @@ let getTemplateExpectNoWarning str =
 
 let reader = Template.Reader.build
 let writer = Template.Writer.build
-let read = Template.Reader.read
+let read r str = match Template.Reader.read r str with Ok vars -> vars | Error x -> failwithf "Expected successful read: %s" x
 let write = Template.Writer.toString
 
 [<Test>]
@@ -26,6 +26,6 @@ let Test1 () =
     let r = reader tmp
     Assert.AreEqual(
         Map.ofList [("ModuleName", "TestModule"); ("Ident", "Hello")],
-        read r "module TestModule = \n\
+        read r "module TestModule =\n\
                 \tlet Hello = TestModule"
     )
