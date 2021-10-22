@@ -134,11 +134,11 @@ module Template =
 
     module Parser =
 
-        let variableName = many1Chars2 (satisfy isAsciiUpper) (satisfy isAsciiLower) <?> "Variable identifier"
+        let variableName = many1Chars2 (satisfy isAsciiUpper) (satisfy isLetter) <?> "Variable identifier"
 
         let parseMatch : Parser<MatchExt, unit> =
 
-            let stringEscape = manyChars ((noneOf "\"\\") <|> (pstring "\\\"" >>% '"') <|> (pstring "\\\\" >>% '\\'))
+            let stringEscape = manyChars ((noneOf "\"\\\r\n") <|> (pstring "\\\"" >>% '"') <|> (pstring "\\\\" >>% '\\'))
 
             let variable = variableName |>> MatchExt.Variable
             let exact = between (pchar '"') (pchar '"') stringEscape |>> MatchExt.Exact
@@ -199,7 +199,7 @@ module Template =
                 match m with
                 | Match.Variable v -> getUserState >>= (Map.find v >> pstring)
                 | Match.Exact s -> pstring s
-                | Match.CaseInsensitive s -> pstring s //nyi
+                | Match.CaseInsensitive s -> pstringCI s
                 | Match.Whitespace _ -> skipped spaces
                 | Match.Choice (head, rest) -> matchParser head <|> matchParser rest
                 | Match.Regex ex -> regex ex
