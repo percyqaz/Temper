@@ -10,7 +10,20 @@ This library is my take on string templating, with the catch that **templates ca
 
 2. Code generation. T4 templates (and similar templating projects I found) are very powerful, but because of this only go from data -> text. Part of the simple design for this project is to allow for reading a code file, changing a few bits of data, and writing back.
 
-### To-do list:
-- Build a few more of the features I have in my head
-- Write tests
-- Write documentation
+### Milestone list:
+#### Tests
+- [x] Have one test
+- [ ] Full reading tests
+- [ ] Full writing tests
+- [ ] Round trip tests
+- [ ] Template warning tests
+#### Documentation
+- [ ] Have a wiki page
+- [ ] Document syntax
+- [ ] Document API
+- [ ] Examples library
+#### Functionality
+- [x] Basic read-write templating
+- [ ] Warning codes
+- [ ] List & Object-typed data
+- [ ] Data lenses 
