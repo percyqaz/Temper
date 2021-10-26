@@ -21,11 +21,24 @@ let write = Template.Writer.toString
 let Test1 () =
     let tmp =
         getTemplateExpectNoWarning
-            "module {{ModuleName:ident}} =\n\
-            \tlet {{Ident:ident}} = {{:ModuleName|\"()\"}}"
+            """
+            module %ModuleName:ident% =\
+                let %Ident:ident% = %:ModuleName|"()"%
+            """
     let r = reader tmp
     Assert.AreEqual(
         Map.ofList [("ModuleName", "TestModule"); ("Ident", "Hello")],
-        read r "module TestModule =\n\
-                \tlet Hello = TestModule"
+        read r 
+            """
+            module TestModule =\
+                let Hello = TestModule
+            """
+    )
+    Assert.AreEqual(
+        Map.ofList [("ModuleName", "TestModule"); ("Ident", "Hello")],
+        read r 
+            """
+            module TestModule =\
+                let Hello = ()
+            """
     )

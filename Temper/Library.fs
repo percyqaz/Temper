@@ -173,10 +173,10 @@ module Template =
             loop
 
         let parseFragment : Parser<TemplateFragmentExt, unit> =
-            let raw = many1CharsTill anyChar (followedBy (pstring "{{") <|> eof) |>> TemplateFragmentExt.Raw
-            let discard = between (pstring "{{:") (pstring "}}") parseMatch |>> TemplateFragmentExt.Discard
+            let raw = many1CharsTill anyChar (followedBy (pstring "%") <|> eof) |>> TemplateFragmentExt.Raw
+            let discard = between (pstring "%:") (pstring "%") parseMatch |>> TemplateFragmentExt.Discard
             let variable =
-                between (pstring "{{") (pstring "}}")
+                between (pstring "%") (pstring "%")
                     (variableName .>>. (opt (pchar ':' >>. parseMatch) |>> Option.defaultValue MatchExt.Auto)) |>> TemplateFragmentExt.Variable
             choiceL
                 [
