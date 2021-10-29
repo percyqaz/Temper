@@ -19,6 +19,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Data.fs" />
+    <Compile Include="Tree.fs" />
+    <Compile Include="Parser.fs" />
+    <Compile Include="Semantics.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
 

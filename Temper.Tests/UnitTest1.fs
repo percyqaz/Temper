@@ -8,29 +8,30 @@ let Setup () =
     ()
 
 let getTemplateExpectNoWarning str =
-    match Template.Parser.parseTemplate str with
-    | Ok (tmp, []) -> tmp
+    match Template.fromString str with
+    | Ok tmp -> tmp
     | x -> failwithf "Expected template parse with no warnings but got %A" x
 
-let reader = Template.Reader.build
-let writer = Template.Writer.build
-let read r str = match Template.Reader.read r str with Ok vars -> vars | Error x -> failwithf "Expected successful read: %s" x
-let write = Template.Writer.toString
+let reader = Reader.build
+let writer = Writer.build
+let read r str = match Reader.read r str with Result.Ok vars -> vars | Result.Error x -> failwithf "Expected successful read: %s" x
+let write = Writer.toString
 
 [<Test>]
 let Test1 () =
     let tmp =
         getTemplateExpectNoWarning
             """
-            module %ModuleName:ident% =\
+            module %ModuleName:ident% =
                 let %Ident:ident% = %:ModuleName|"()"%
             """
+    printfn "%A" tmp
     let r = reader tmp
     Assert.AreEqual(
         Map.ofList [("ModuleName", "TestModule"); ("Ident", "Hello")],
         read r 
             """
-            module TestModule =\
+            module TestModule =
                 let Hello = TestModule
             """
     )
@@ -38,7 +39,7 @@ let Test1 () =
         Map.ofList [("ModuleName", "TestModule"); ("Ident", "Hello")],
         read r 
             """
-            module TestModule =\
+            module TestModule =
                 let Hello = ()
             """
     )
