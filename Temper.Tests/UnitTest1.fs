@@ -2,6 +2,7 @@ module Temper.Tests
 
 open NUnit.Framework
 open Temper
+open Temper.Data
 
 [<SetUp>]
 let Setup () =
@@ -28,7 +29,7 @@ let Test1 () =
     printfn "%A" tmp
     let r = reader tmp
     Assert.AreEqual(
-        Map.ofList [("ModuleName", "TestModule"); ("Ident", "Hello")],
+        Map.ofList [("ModuleName", String "TestModule"); ("Ident", String "Hello")],
         read r 
             """
             module TestModule =
@@ -36,7 +37,7 @@ let Test1 () =
             """
     )
     Assert.AreEqual(
-        Map.ofList [("ModuleName", "TestModule"); ("Ident", "Hello")],
+        Map.ofList [("ModuleName", String "TestModule"); ("Ident", String "Hello")],
         read r 
             """
             module TestModule =

@@ -42,7 +42,7 @@ module Reader =
         let rec parser frags : Parser<unit, Vars> =
             match frags with
             | [] -> preturn ()
-            | x :: y :: xs -> fragParser x (Some y) >>. parser xs
+            | x :: y :: xs -> fragParser x (Some y) >>. parser (y :: xs)
             | x :: xs -> fragParser x None >>. parser xs
             
         parser template.Body
