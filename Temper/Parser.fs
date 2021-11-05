@@ -45,6 +45,8 @@ module Parser =
             <|> (pstring "restofline" >>% Regex @".*")
             <|> (pstring "ident" >>% Regex @"\w+")
 
+        let choicePattern, choicePatternRef = createParserForwardedToRef()
+
         let simpleMatch : Parser<PatternEx, unit> =
             choiceL
                 [
@@ -56,12 +58,20 @@ module Parser =
                     shorthands
                 ] "pattern"
 
-        let loop, loopRef = createParserForwardedToRef()
-        loopRef.Value <-
-            simpleMatch .>>. (opt (pchar '|' >>. loop))
-            |>> fun (head, rest) ->
-                match rest with Some r -> Choice (head, r) | None -> head
-        loop
+        let specialMatch : Parser<PatternEx, unit> =
+            between (pchar '(') (pchar ')') choicePattern <|> simpleMatch >>=
+            ( fun pat ->
+                (pchar '?' >>% Optional pat)
+                <|> (pchar '*' >>% Star pat)
+                <|> preturn pat
+            )
+
+        choicePatternRef.Value <-
+            specialMatch
+            .>>. (opt (pchar '|' >>. choicePattern))
+            |>> function (head, Some rest) -> Choice (head, rest) | (head, None) -> head
+
+        choicePattern
 
     let parseFragment : Parser<TemplateFragmentEx, unit> =
         let raw = many1CharsTill anyChar (followedBy (pstring "%") <|> eof) |>> Raw

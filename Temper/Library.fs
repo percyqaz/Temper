@@ -20,9 +20,19 @@ module Reader =
 
     let build (template: Template) =
 
+        let rec varParser (v: VarValue) : Parser<VarValue, Vars> =
+            match v with
+            | String s -> pstringAllowNewline s >>% v
+            | Option None -> preturn v
+            | Option (Some x) -> varParser x >>% v
+            | List (x :: xs) -> varParser x .>> varParser (List xs) >>% v
+            | List [] -> preturn v
+            | Object _ -> failwith "not supported"
+
         let rec matchParser (m: PatternGuts) (fragAhead: TemplateFragment option) : Parser<VarValue, Vars> =
             match m with
-            | Variable v -> getUserState >>= (Map.find v >> (fun (x: VarValue) -> x.Lens.Text) >> pstringAllowNewline) |>> String // redo this to handle lists, options, whatever
+            | Variable v ->
+                getUserState >>= (Map.find v >> varParser)
             | Exact s -> pstring s |>> String
             | CaseInsensitive s -> pstringCI s |>> String
             | Whitespace _ -> skipped spaces |>> String
