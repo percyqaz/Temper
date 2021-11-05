@@ -6,13 +6,13 @@
 
 open Temper.Data
 
-type WhitespaceDefault =
+type Whitespaces =
     | NoWhitespace
     | Tab
     | Space
     | Newline
 
-module WhitespaceDefault =
+module Whitespaces =
     
     let toString wd =
         match wd with
@@ -21,41 +21,31 @@ module WhitespaceDefault =
         | Space -> " "
         | Newline -> "\n"
 
-type Match =
-    | Variable of ident: string
+type PatternGuts =
     | Exact of string
     | CaseInsensitive of string
-    | Whitespace of WhitespaceDefault
     | Regex of string
-    | Choice of Match * Match
+    | Whitespace of Whitespaces
+    | Variable of ident: string
+    | Choice of PatternGuts * PatternGuts
+    | Optional of PatternGuts * defaultNone: bool
+    | Star of PatternGuts * defaultEmpty: bool
     | Auto
 
-module Match =
-    
-    let rec canInferDefault m =
-        match m with
-        | Variable _
-        | Exact _
-        | CaseInsensitive _
-        | Whitespace _ -> true
-        | Choice (first, rest) -> canInferDefault first || canInferDefault rest
-        | Auto
-        | Regex _ -> false
+type PatternInferFunc =
+    | F of func: (Vars -> VarValue)
+    | CannotInfer of message: string
 
-    let rec inferDefault vars m =
-        match m with
-        | Variable v -> Map.find v vars |> fun (x: VarValue) -> x.Lens.Text
-        | Exact s -> s
-        | CaseInsensitive s -> s
-        | Whitespace wd -> WhitespaceDefault.toString wd
-        | Choice (first, rest) -> if canInferDefault first then inferDefault vars first else inferDefault vars rest
-        | Auto
-        | Regex _ -> failwith "Cannot infer a default value here"
+type Pattern = 
+    {
+        Guts: PatternGuts
+        InferDefault: PatternInferFunc // Infer func is created by sem analysis
+    }
 
 type TemplateFragment =
     | Raw of string
-    | Discard of Match
-    | Variable of ident: string * Match
+    | Discard of Pattern
+    | Capture of ident: string * Pattern
 
 type Template =
     {

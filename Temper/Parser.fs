@@ -7,43 +7,45 @@
 open FParsec
 open Temper.Tree
 
-type MatchExt =
-    | Variable of ident: string
+type PatternEx =
     | Exact of string
     | CaseInsensitive of string
-    | Whitespace of WhitespaceDefault
     | Regex of string
+    | Whitespace of Whitespaces
+    | Variable of ident: string
+    | Choice of PatternEx * PatternEx
+    | Optional of PatternEx
+    | Star of PatternEx
     | Auto
-    | Choice of MatchExt * MatchExt
 
-type TemplateFragmentExt =
+type TemplateFragmentEx =
     | Raw of string
-    | Discard of MatchExt
-    | Variable of ident: string * MatchExt
+    | Discard of PatternEx
+    | Capture of ident: string * PatternEx
 
 module Parser =
 
     let variableName = many1Chars2 (satisfy isAsciiUpper) (satisfy isLetter) <?> "Variable identifier"
 
-    let parseMatch : Parser<MatchExt, unit> =
+    let parseMatch : Parser<PatternEx, unit> =
 
         let stringEscape = manyChars ((noneOf "\"\\\r\n") <|> (pstring "\\\"" >>% '"') <|> (pstring "\\\\" >>% '\\'))
 
-        let variable = variableName |>> MatchExt.Variable
-        let exact = between (pchar '"') (pchar '"') stringEscape |>> MatchExt.Exact
-        let caseInsensitive = between (pstring "^\"") (pchar '"') stringEscape |>> MatchExt.CaseInsensitive
+        let variable = variableName |>> Variable
+        let exact = between (pchar '"') (pchar '"') stringEscape |>> Exact
+        let caseInsensitive = between (pstring "^\"") (pchar '"') stringEscape |>> CaseInsensitive
         let whitespace =
-            (pstring "space" >>% MatchExt.Whitespace WhitespaceDefault.Space)
-            <|> (pstring "tab" >>% MatchExt.Whitespace WhitespaceDefault.Tab)
-            <|> (pstring "newline" >>% MatchExt.Whitespace WhitespaceDefault.Newline)
-            <|> (pstring "ws" >>% MatchExt.Whitespace WhitespaceDefault.NoWhitespace)
-        let regex = between (pstring "r\"") (pchar '"') stringEscape |>> MatchExt.Regex
+            (pstring "space" >>% Whitespace Space)
+            <|> (pstring "tab" >>% Whitespace Tab)
+            <|> (pstring "newline" >>% Whitespace Newline)
+            <|> (pstring "ws" >>% Whitespace NoWhitespace)
+        let regex = between (pstring "r\"") (pchar '"') stringEscape |>> Regex
         let shorthands =
-            (pstring "auto" >>% MatchExt.Auto)
-            <|> (pstring "restofline" >>% MatchExt.Regex @".*")
-            <|> (pstring "ident" >>% MatchExt.Regex @"\w+")
+            (pstring "auto" >>% Auto)
+            <|> (pstring "restofline" >>% Regex @".*")
+            <|> (pstring "ident" >>% Regex @"\w+")
 
-        let simpleMatch : Parser<MatchExt, unit> =
+        let simpleMatch : Parser<PatternEx, unit> =
             choiceL
                 [
                     variable;
@@ -58,15 +60,15 @@ module Parser =
         loopRef.Value <-
             simpleMatch .>>. (opt (pchar '|' >>. loop))
             |>> fun (head, rest) ->
-                match rest with Some r -> MatchExt.Choice (head, r) | None -> head
+                match rest with Some r -> Choice (head, r) | None -> head
         loop
 
-    let parseFragment : Parser<TemplateFragmentExt, unit> =
-        let raw = many1CharsTill anyChar (followedBy (pstring "%") <|> eof) |>> TemplateFragmentExt.Raw
-        let discard = between (pstring "%:") (pstring "%") parseMatch |>> TemplateFragmentExt.Discard
+    let parseFragment : Parser<TemplateFragmentEx, unit> =
+        let raw = many1CharsTill anyChar (followedBy (pstring "%") <|> eof) |>> Raw
+        let discard = between (pstring "%:") (pstring "%") parseMatch |>> Discard
         let variable =
             between (pstring "%") (pstring "%")
-                (variableName .>>. (opt (pchar ':' >>. parseMatch) |>> Option.defaultValue MatchExt.Auto)) |>> TemplateFragmentExt.Variable
+                (variableName .>>. (opt (pchar ':' >>. parseMatch) |>> Option.defaultValue Auto)) |>> Capture
         choiceL
             [
                 discard;
@@ -74,7 +76,7 @@ module Parser =
                 raw
             ] "fragment"
 
-    let parseFragments str : Result<TemplateFragmentExt array, string> =
+    let parseFragments str : Result<TemplateFragmentEx array, string> =
         match run (many parseFragment) str with
         | ParserResult.Success (v, _, _) -> Result.Ok (Array.ofList v)
         | ParserResult.Failure (err, _, _) -> Result.Error err

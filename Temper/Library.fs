@@ -20,24 +20,27 @@ module Reader =
 
     let build (template: Template) =
 
-        let rec matchParser (m: Match) (fragAhead: TemplateFragment option) : Parser<string, Vars> =
+        let rec matchParser (m: PatternGuts) (fragAhead: TemplateFragment option) : Parser<VarValue, Vars> =
             match m with
-            | Match.Variable v -> getUserState >>= (Map.find v >> (fun (x: VarValue) -> x.Lens.Text) >> pstringAllowNewline)
-            | Match.Exact s -> pstring s
-            | Match.CaseInsensitive s -> pstringCI s
-            | Match.Whitespace _ -> skipped spaces
-            | Match.Choice (head, rest) -> matchParser head fragAhead <|> matchParser rest fragAhead
-            | Match.Regex ex -> regex ex
-            | Match.Auto ->
+            | Variable v -> getUserState >>= (Map.find v >> (fun (x: VarValue) -> x.Lens.Text) >> pstringAllowNewline) |>> String // redo this to handle lists, options, whatever
+            | Exact s -> pstring s |>> String
+            | CaseInsensitive s -> pstringCI s |>> String
+            | Whitespace _ -> skipped spaces |>> String
+            | Choice (head, rest) -> matchParser head fragAhead <|> matchParser rest fragAhead
+            | Regex ex -> regex ex |>> String
+            | Optional (pat, _) -> opt (matchParser pat fragAhead) |>> Option
+            | Star (pat, _) -> many (matchParser pat fragAhead) |>> List
+            | Auto ->
                 match fragAhead with
                 | Some f -> (manyCharsTill anyChar (followedBy (fragParser f None)))
                 | None -> manyCharsTill anyChar eof
+                |>> String
             
         and fragParser (frag: TemplateFragment) (fragAhead: TemplateFragment option) : Parser<unit, Vars> =
             match frag with
             | Raw s -> pstringAllowNewline s >>% ()
-            | Discard m -> matchParser m fragAhead >>% ()
-            | Variable (v, m) -> matchParser m fragAhead >>= (fun x -> updateUserState (Map.add v (String x)))
+            | Discard m -> matchParser m.Guts fragAhead >>% ()
+            | Capture (v, m) -> matchParser m.Guts fragAhead >>= (fun x -> updateUserState (Map.add v x))
 
         let rec parser frags : Parser<unit, Vars> =
             match frags with
@@ -61,11 +64,30 @@ module Writer =
             for v in template.Variables.Keys do
                 if snd template.Variables.[v] && not (Map.containsKey v vars) then failwithf "Variable '%s' is required." v
 
+            let rec writeValue (tw: TextWriter) (value: VarValue) =
+                match value with
+                | String s -> tw.Write s
+                | Option None -> ()
+                | Option (Some v) -> writeValue tw v
+                | List xs -> List.iter (writeValue tw) xs
+                | Object _ -> failwith "not supported"
+
             let writeFrag (tw: TextWriter) (frag: TemplateFragment) =
                 match frag with
                 | Raw s -> tw.Write s
-                | Discard m -> Match.inferDefault vars m |> tw.Write
-                | Variable (v, m) -> Map.tryFind v vars |> Option.map (fun x -> x.Lens.Text) |> Option.defaultWith ( fun () -> Match.inferDefault vars m ) |> tw.Write
+                | Discard m ->
+                    match m.InferDefault with
+                    | F f -> f vars |> tw.Write
+                    | CannotInfer reason -> failwith reason
+                | Capture (v, m) ->
+                    Map.tryFind v vars
+                    |> Option.defaultWith
+                        ( fun () -> 
+                            match m.InferDefault with
+                            | F f -> f vars
+                            | CannotInfer reason -> failwith reason
+                        )
+                    |> writeValue tw
 
             fun (tw: TextWriter) ->
                 List.iter (writeFrag tw) template.Body
@@ -78,7 +100,7 @@ module Writer =
 type TemplateCreationResult =
     | Ok of Template
     | Warnings of Template * TemplateWarning list
-    | SemanticFail of TemplateWarning
+    | SemanticFail of TemplateError
     | ParseFail of string
 
 module Template =
@@ -89,5 +111,5 @@ module Template =
             match Semantics.check frags with
             | Result.Ok (tmp, []) -> Ok tmp
             | Result.Ok (tmp, warnings) -> Warnings (tmp, warnings)
-            | Result.Error msg -> SemanticFail msg
+            | Result.Error err -> SemanticFail err
         | Result.Error msg -> ParseFail msg
