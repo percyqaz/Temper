@@ -12,7 +12,7 @@ This library is my take on string templating, with the catch that **templates ca
 
 ### Milestone list:
 #### Tests
-- [x] Have one test
+- [x] Have some tests
 - [ ] Full reading tests
 - [ ] Full writing tests
 - [ ] Round trip tests
@@ -24,6 +24,6 @@ This library is my take on string templating, with the catch that **templates ca
 - [ ] Examples library
 #### Functionality
 - [x] Basic read-write templating
-- [ ] Warning codes
-- [ ] List & Object-typed data
-- [ ] Data lenses 
+- [x] Warning codes
+- [x] Data types & Data lenses
+- [ ] Sub-templates/meta template stuff
