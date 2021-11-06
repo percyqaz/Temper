@@ -31,8 +31,7 @@ module Reader =
 
         let rec patternParser (m: PatternGuts) (fragAhead: TemplateFragment option) : Parser<VarValue, Vars> =
             match m with
-            | Variable v ->
-                getUserState >>= (Map.find v >> varParser)
+            | Variable v -> getUserState >>= (Map.find v >> varParser)
             | Exact s -> pstring s |>> String
             | CaseInsensitive s -> pstringCI s |>> String
             | Whitespace _ -> skipped spaces |>> String

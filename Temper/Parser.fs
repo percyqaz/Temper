@@ -50,16 +50,16 @@ module Parser =
         let simplePattern : Parser<PatternEx, unit> =
             choiceL
                 [
-                    variable;
-                    exact;
-                    caseInsensitive;
-                    whitespace;
-                    regex;
+                    variable
+                    exact
+                    caseInsensitive
+                    whitespace
+                    regex
                     shorthands
                 ] "pattern"
 
         let specialPattern : Parser<PatternEx, unit> =
-            between (pchar '(') (pchar ')') pattern <|> simplePattern >>=
+            between (pchar '(' .>> spaces) (spaces >>. pchar ')') pattern <|> simplePattern >>=
             ( fun pat ->
                 (pchar '?' >>% Optional pat)
                 <|> (pchar '*' >>% Star pat)
@@ -68,21 +68,37 @@ module Parser =
 
         patternRef.Value <-
             specialPattern
-            .>>. (opt (pchar '|' >>. pattern))
+            .>>. (opt (attempt (spaces >>. pchar '|' >>. spaces) >>. pattern))
             |>> function (head, Some rest) -> Choice (head, rest) | (head, None) -> head
 
         pattern
 
     let parseFragment : Parser<TemplateFragmentEx, unit> =
-        let raw = many1CharsTill anyChar (followedBy (pstring "%") <|> eof) |>> Raw
-        let discard = between (pstring "%:") (pstring "%") parsePattern |>> Discard
+
+        let raw = 
+            many1CharsTill
+                anyChar
+                (followedBy (pstring "%") <|> eof)
+             |>> Raw
+
+        let discard =
+            between
+                (pstring "%:" .>> spaces)
+                (spaces >>. pstring "%")
+                parsePattern
+            |>> Discard
+
         let variable =
-            between (pstring "%") (pstring "%")
-                (variableName .>>. (opt (pchar ':' >>. parsePattern) |>> Option.defaultValue Auto)) |>> Capture
+            between
+                (pstring "%" >>. spaces)
+                (spaces >>. pstring "%")
+                (variableName .>>. (opt (pchar ':' >>. spaces >>. parsePattern) |>> Option.defaultValue Auto))
+            |>> Capture
+
         choiceL
             [
-                discard;
-                variable;
+                discard
+                variable
                 raw
             ] "fragment"
 

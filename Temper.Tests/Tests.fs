@@ -40,8 +40,8 @@ let Test1 () =
     let r =
         getReaderExpectNoWarning
             """
-            module %ModuleName:ident% =
-                let %Ident:ident% = %:ModuleName|"()"%
+            module % ModuleName: ident % =
+                let % Ident: ident % = %: ModuleName | "()" %
             """
     Assert.AreEqual(
         Map.ofList [("ModuleName", String "TestModule"); ("Ident", String "Hello")],
