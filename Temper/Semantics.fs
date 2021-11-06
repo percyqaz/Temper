@@ -52,7 +52,7 @@ module Semantics =
             match m with
             | Exact s -> F (fun _ -> String s)
             | CaseInsensitive s -> F (fun _ -> String s)
-            | Whitespace wd -> F (fun _ -> Whitespaces.toString wd |> String)
+            | Whitespace wd -> F (fun _ -> String wd.AsString)
             | Optional (pat, defaultNone) -> 
                 if defaultNone then 
                     F (fun _ -> Option None)

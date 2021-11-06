@@ -11,15 +11,13 @@ type Whitespaces =
     | Tab
     | Space
     | Newline
-
-module Whitespaces =
-    
-    let toString wd =
-        match wd with
-        | NoWhitespace -> ""
-        | Tab -> "\t"
-        | Space -> " "
-        | Newline -> "\n"
+    member this.AsString
+        with get() =
+            match this with
+            | NoWhitespace -> ""
+            | Tab -> "\t"
+            | Space -> " "
+            | Newline -> "\n"
 
 type PatternGuts =
     | Exact of string

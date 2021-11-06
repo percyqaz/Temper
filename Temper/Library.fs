@@ -29,17 +29,17 @@ module Reader =
             | List [] -> preturn v
             | Object _ -> failwith "not supported"
 
-        let rec matchParser (m: PatternGuts) (fragAhead: TemplateFragment option) : Parser<VarValue, Vars> =
+        let rec patternParser (m: PatternGuts) (fragAhead: TemplateFragment option) : Parser<VarValue, Vars> =
             match m with
             | Variable v ->
                 getUserState >>= (Map.find v >> varParser)
             | Exact s -> pstring s |>> String
             | CaseInsensitive s -> pstringCI s |>> String
             | Whitespace _ -> skipped spaces |>> String
-            | Choice (head, rest) -> matchParser head fragAhead <|> matchParser rest fragAhead
+            | Choice (head, rest) -> patternParser head fragAhead <|> patternParser rest fragAhead
             | Regex ex -> regex ex |>> String
-            | Optional (pat, _) -> opt (matchParser pat fragAhead) |>> Option
-            | Star (pat, _) -> many (matchParser pat fragAhead) |>> List
+            | Optional (pat, _) -> opt (patternParser pat fragAhead) |>> Option
+            | Star (pat, _) -> many (patternParser pat fragAhead) |>> List
             | Auto ->
                 match fragAhead with
                 | Some f -> (manyCharsTill anyChar (followedBy (fragParser f None)))
@@ -49,8 +49,8 @@ module Reader =
         and fragParser (frag: TemplateFragment) (fragAhead: TemplateFragment option) : Parser<unit, Vars> =
             match frag with
             | Raw s -> pstringAllowNewline s >>% ()
-            | Discard m -> matchParser m.Guts fragAhead >>% ()
-            | Capture (v, m) -> matchParser m.Guts fragAhead >>= (fun x -> updateUserState (Map.add v x))
+            | Discard m -> patternParser m.Guts fragAhead >>% ()
+            | Capture (v, m) -> patternParser m.Guts fragAhead >>= (fun x -> updateUserState (Map.add v x))
 
         let rec parser frags : Parser<unit, Vars> =
             match frags with

@@ -27,7 +27,7 @@ module Parser =
 
     let variableName = many1Chars2 (satisfy isAsciiUpper) (satisfy isLetter) <?> "Variable identifier"
 
-    let parseMatch : Parser<PatternEx, unit> =
+    let parsePattern : Parser<PatternEx, unit> =
 
         let stringEscape = manyChars ((noneOf "\"\\\r\n") <|> (pstring "\\\"" >>% '"') <|> (pstring "\\\\" >>% '\\'))
 
@@ -45,9 +45,9 @@ module Parser =
             <|> (pstring "restofline" >>% Regex @".*")
             <|> (pstring "ident" >>% Regex @"\w+")
 
-        let choicePattern, choicePatternRef = createParserForwardedToRef()
+        let pattern, patternRef = createParserForwardedToRef()
 
-        let simpleMatch : Parser<PatternEx, unit> =
+        let simplePattern : Parser<PatternEx, unit> =
             choiceL
                 [
                     variable;
@@ -58,27 +58,27 @@ module Parser =
                     shorthands
                 ] "pattern"
 
-        let specialMatch : Parser<PatternEx, unit> =
-            between (pchar '(') (pchar ')') choicePattern <|> simpleMatch >>=
+        let specialPattern : Parser<PatternEx, unit> =
+            between (pchar '(') (pchar ')') pattern <|> simplePattern >>=
             ( fun pat ->
                 (pchar '?' >>% Optional pat)
                 <|> (pchar '*' >>% Star pat)
                 <|> preturn pat
             )
 
-        choicePatternRef.Value <-
-            specialMatch
-            .>>. (opt (pchar '|' >>. choicePattern))
+        patternRef.Value <-
+            specialPattern
+            .>>. (opt (pchar '|' >>. pattern))
             |>> function (head, Some rest) -> Choice (head, rest) | (head, None) -> head
 
-        choicePattern
+        pattern
 
     let parseFragment : Parser<TemplateFragmentEx, unit> =
         let raw = many1CharsTill anyChar (followedBy (pstring "%") <|> eof) |>> Raw
-        let discard = between (pstring "%:") (pstring "%") parseMatch |>> Discard
+        let discard = between (pstring "%:") (pstring "%") parsePattern |>> Discard
         let variable =
             between (pstring "%") (pstring "%")
-                (variableName .>>. (opt (pchar ':' >>. parseMatch) |>> Option.defaultValue Auto)) |>> Capture
+                (variableName .>>. (opt (pchar ':' >>. parsePattern) |>> Option.defaultValue Auto)) |>> Capture
         choiceL
             [
                 discard;
