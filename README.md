@@ -2,7 +2,7 @@
 
 **String templating** is when you have some data, and by writing a **template** you describe how to transform that data into a piece of text. There are tons of uses for this, but especially code generation in my case.
 
-This library is my take on string templating, with the catch that **templates can also be used to parse pieces of text, and re-extract the data**.
+This library is my take on string templating, with the twist that **templates can also be used as text parses, and re-extract the data**.
 
 ### My main goals with this:
 
