@@ -39,7 +39,7 @@ let write = Writer.toString
 let Test1 () =
     let r =
         getReaderExpectNoWarning
-            """
+            """%* Comment *%
             module % ModuleName: ident % =
                 let % Ident: ident % = %: ModuleName | "()" %
             """
@@ -61,7 +61,7 @@ let Test1 () =
     )
 
 [<TestFixture>]
-module Reading =
+module Patterns =
 
     [<Test>]
     let ExactString () =
@@ -84,6 +84,16 @@ module Reading =
         exBadRead r """ Hello World HELLO """
 
     [<Test>]
+    let Regex () =
+        let r = getReaderExpectNoWarning """ %VAR:r"[a-z.]*"% X %:VAR% """
+
+        exGoodRead r """ hello X hello """
+        exGoodRead r """ zoo.wee.mama X zoo.wee.mama """
+        exGoodRead r """ ... X ... """
+        exBadRead r """ .. X . """
+        exBadRead r """ aA X aA """
+
+    [<Test>]
     let Optional () =
         let r = getReaderExpectNoWarning """ %VAR:"Hello"?% World %:VAR% """
 
@@ -102,3 +112,13 @@ module Reading =
         exGoodRead r """ World """
         exBadRead r """ HelloWorld """
         exBadRead r """ WorldHelloHello """
+
+    [<Test>]
+    let Definition () =
+        let r = getReaderExpectNoWarning """%# HelloWorlds = (^"Hello" | "World")* % %VAR: #HelloWorlds % ! %: VAR % """
+
+        exGoodRead r """ HellohelloWorldHELLO ! HellohelloWorldHELLO """
+        exGoodRead r """  !  """
+        exGoodRead r """ World ! World """
+        exBadRead r """ HELLO ! """
+        exBadRead r """ helloWorld ! HelloWorld """

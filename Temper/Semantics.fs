@@ -19,6 +19,10 @@ module WarningCode =
         let optionInChoice = "TM104"
         let ambiguousList = "TM105"
         let ambiguous = "TM106"
+    module PatternDefinition =
+        let notFound = "TM201"
+        let alreadyExists = "TM202"
+        
 
 open WarningCode
 
@@ -45,6 +49,7 @@ module Semantics =
         let crit i code msg = raise (TemplateError (i, code, msg))
 
         let varDefs = Dictionary<string, VarType * bool>()
+        let patternDefs = Dictionary<string, PatternGuts>()
         
         // Works out if a pattern can generate a default value when writing
         // Used when writing discard fragments
@@ -113,6 +118,8 @@ module Semantics =
                     warn i Pattern.consecutiveAuto "An auto pattern cannot be followed directly by another auto pattern to avoid ambiguous parsing."
                 blockAutoFrag <- i + 1
                 Auto
+            | PatternEx.Definition d ->
+                if patternDefs.ContainsKey d then patternDefs.[d] else crit i PatternDefinition.notFound (sprintf "The pattern macro '%s' doesn't exist!" d)
             | PatternEx.Choice (head, rest) ->
                 match head, rest with
                 | _, PatternEx.Optional _
@@ -135,16 +142,18 @@ module Semantics =
 
         let checkFrag (i: int) (f: TemplateFragmentEx) =
             match f with
-            | TemplateFragmentEx.Raw s -> Raw s
+            | TemplateFragmentEx.Comment s -> None
+
+            | TemplateFragmentEx.Raw s -> Some (Raw s)
 
             | TemplateFragmentEx.Discard pat ->
                 let checkedPat = checkPatternEx i pat
                 match inferDefaultFunc checkedPat with
-                | F f -> Discard { Guts = checkedPat; InferDefault = F f }
+                | F f -> Discard { Guts = checkedPat; InferDefault = F f } |> Some
                 | CannotInfer reason -> 
                     warn i Pattern.discardingWithoutDefault
                         (sprintf "This pattern doesn't take a default value! Discarding it prevents the template from being used to generate text.\n%s" reason)
-                    Discard { Guts = checkedPat; InferDefault = CannotInfer reason }
+                    Discard { Guts = checkedPat; InferDefault = CannotInfer reason } |> Some
 
             | TemplateFragmentEx.Capture (v, pat) ->
                 let checkedPat = checkPatternEx i pat
@@ -158,11 +167,23 @@ module Semantics =
                     warn i Variable.alreadyExists (sprintf "The variable '%s' has already been bound!" v)
                 else varDefs.Add(v, (varType, required))
 
-                Capture (v, { Guts = checkedPat; InferDefault = inferFunc })
+                Capture (v, { Guts = checkedPat; InferDefault = inferFunc }) |> Some
+
+            | TemplateFragmentEx.Define (d, pat) ->
+                let checkedPat = checkPatternEx i pat
+                let varType = inferPatternType i checkedPat
+
+                if varDefs.ContainsKey d then 
+                    warn i PatternDefinition.alreadyExists (sprintf "The pattern macro name '%s' has already been used!" d)
+                else patternDefs.Add(d, checkedPat)
+
+                None
 
         try
-            let checkedFrags : TemplateFragment array = Array.zeroCreate fragments.Length
-            Array.iteri (fun i f -> checkedFrags.[i] <- checkFrag i f) fragments
+            let checkedFrags : TemplateFragment array =
+                fragments
+                |> Array.mapi (fun i f -> checkFrag i f)
+                |> Array.choose id
 
             Ok (
                 { 

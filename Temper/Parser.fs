@@ -16,12 +16,15 @@ type PatternEx =
     | Choice of PatternEx * PatternEx
     | Optional of PatternEx
     | Star of PatternEx
+    | Definition of ident: string
     | Auto
 
 type TemplateFragmentEx =
+    | Comment of string
     | Raw of string
     | Discard of PatternEx
     | Capture of ident: string * PatternEx
+    | Define of ident: string * PatternEx
 
 module Parser =
 
@@ -31,7 +34,8 @@ module Parser =
 
         let stringEscape = manyChars ((noneOf "\"\\\r\n") <|> (pstring "\\\"" >>% '"') <|> (pstring "\\\\" >>% '\\'))
 
-        let variable = variableName |>> Variable
+        let variable = variableName |>> Variable // todo: 'as' pattern
+        let definition = pchar '#' >>. variableName |>> Definition
         let exact = between (pchar '"') (pchar '"') stringEscape |>> Exact
         let caseInsensitive = between (pstring "^\"") (pchar '"') stringEscape |>> CaseInsensitive
         let whitespace =
@@ -50,12 +54,13 @@ module Parser =
         let simplePattern : Parser<PatternEx, unit> =
             choiceL
                 [
-                    variable
-                    exact
                     caseInsensitive
-                    whitespace
                     regex
+                    exact
+                    definition
+                    variable
                     shorthands
+                    whitespace
                 ] "pattern"
 
         let specialPattern : Parser<PatternEx, unit> =
@@ -95,8 +100,24 @@ module Parser =
                 (variableName .>>. (opt (pchar ':' >>. spaces >>. parsePattern) |>> Option.defaultValue Auto))
             |>> Capture
 
+        let comment =
+            between
+                (pstring "%*")
+                (pstring "*%")
+                (manyCharsTill anyChar (followedBy (pstring "*%")))
+            |>> Comment
+
+        let definition =
+            between
+                (pstring "%#" >>. spaces)
+                (spaces >>. pstring "%")
+                (variableName .>>. (spaces >>. pchar '=' >>. spaces >>. parsePattern))
+            |>> Define
+
         choiceL
             [
+                comment
+                definition
                 discard
                 variable
                 raw
