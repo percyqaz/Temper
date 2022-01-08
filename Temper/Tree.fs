@@ -60,9 +60,13 @@ type TemplateFragment =
     | Discard of Pattern
     | Capture of ident: string * Pattern
 
+// Required = true => You cannot write this template without providing a value
+// Required = false => There exists generic default behaviour if you don't provide a value
+type VarDefinition = { Type: VarType; Required: bool }
+
 type Template =
     {
         Body: TemplateFragment list
-        Variables: Map<string, VarType * bool>
-        Parameters: Map<string, VarType * bool>
+        Variables: Map<string, VarDefinition>
+        Parameters: Map<string, VarDefinition>
     }

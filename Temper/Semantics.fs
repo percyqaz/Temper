@@ -48,7 +48,7 @@ module Semantics =
         let warn i code msg = warnings.Add (Warning (i, code, msg))
         let crit i code msg = raise (TemplateError (i, code, msg))
 
-        let varDefs = Dictionary<string, VarType * bool>()
+        let varDefs = Dictionary<string, VarDefinition>()
         let patternDefs = Dictionary<string, PatternGuts>()
 
         // Works out if a pattern can generate a default value when writing
@@ -94,7 +94,7 @@ module Semantics =
                 let rec checkExpr ex =
                     match ex with
                     | Expr.Variable v -> 
-                        if varDefs.ContainsKey v then fst varDefs.[v]
+                        if varDefs.ContainsKey v then varDefs.[v].Type
                         else crit i Variable.notFound (sprintf "The variable '%s' doesn't exist!" v)
                     | Expr.Property (ex, prop) ->
                         match checkExpr ex with
@@ -176,7 +176,7 @@ module Semantics =
 
                 if varDefs.ContainsKey v then 
                     warn i Variable.alreadyExists (sprintf "The variable '%s' has already been bound!" v)
-                else varDefs.Add(v, (varType, required))
+                else varDefs.Add(v, { Type = varType; Required = required })
 
                 Capture (v, { Guts = checkedPat; InferDefault = inferFunc }) |> Some
 

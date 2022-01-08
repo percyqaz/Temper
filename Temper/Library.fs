@@ -71,7 +71,7 @@ module Writer =
         fun (vars: Vars) ->
 
             for v in template.Variables.Keys do
-                if snd template.Variables.[v] && not (Map.containsKey v vars) then failwithf "Variable '%s' is required." v
+                if template.Variables.[v].Required && not (Map.containsKey v vars) then failwithf "Variable '%s' is required." v
 
             let rec writeValue (tw: TextWriter) (value: VarValue) =
                 match value with
