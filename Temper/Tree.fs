@@ -34,6 +34,10 @@ module Expr =
             | VarValue.Object (ms, _) -> VarValue.Object (ms, kind)
             | _ -> failwith "impossible, this should have been caught at sem analysis"
 
+// Required = true => You cannot write this template without providing a value
+// Required = false => There exists generic default behaviour if you don't provide a value
+type VarDefinition = { Type: VarType; Required: bool }
+
 type PatternGuts =
     | Exact of string
     | CaseInsensitive of string
@@ -43,26 +47,30 @@ type PatternGuts =
     | Choice of PatternGuts * PatternGuts
     | Optional of PatternGuts * defaultNone: bool
     | Star of PatternGuts * defaultEmpty: bool
+    | Subtemplate of SubTemplate
     | Auto
 
-type PatternInferFunc =
+and PatternInferFunc =
     | F of func: (Vars -> VarValue)
     | CannotInfer of message: string
 
-type Pattern = 
+and Pattern = 
     {
         Guts: PatternGuts
         InferDefault: PatternInferFunc // Infer func is created by sem analysis
     }
 
-type TemplateFragment =
+and TemplateFragment =
     | Raw of string
     | Discard of Pattern
     | Capture of ident: string * Pattern
 
-// Required = true => You cannot write this template without providing a value
-// Required = false => There exists generic default behaviour if you don't provide a value
-type VarDefinition = { Type: VarType; Required: bool }
+and SubTemplate =
+    {
+        Body: TemplateFragment list
+        Variables: Map<string, VarDefinition>
+        // todo: parameterise by outer template? will see if a use case comes up
+    }
 
 type Template =
     {

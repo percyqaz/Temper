@@ -79,6 +79,7 @@ module Semantics =
                 | CannotInfer reason -> inferDefaultFunc rest
             | Auto -> CannotInfer "Auto-fragments don't have a default write value"
             | Regex _ -> CannotInfer "Regex expressions don't have a default write value"
+            | Subtemplate _ -> failwith "not supported"
 
         // Works out the type of a pattern (inability to determine this causes semantic analysis to fail)
         let rec inferPatternType (i: int) (m: PatternGuts) : VarType =
@@ -112,6 +113,7 @@ module Semantics =
                 | err ->
                     let msg = Var.TypeCheckResult.prettyPrint err
                     crit i Pattern.typeInferFailed (sprintf "Failed to infer type for this fragment:\n%s" msg)
+            | Subtemplate _ -> failwith "not supported"
 
         // Converts PatternEx to PatternGuts
         // Allows for syntactic sugar/macro constructs that are converted to simpler internal representation
@@ -150,6 +152,9 @@ module Semantics =
                 | PatternEx.Auto _ -> warn i Pattern.ambiguous "Auto fragment cannot appear inside list pattern"
                 | _ -> ()
                 Star (checkPatternEx i pat, true) // todo: user choice if list should try to use singleton of inner pattern default instead of empty
+            | PatternEx.Subtemplate _ ->
+                // todo: refactor to support sem analysis of subtemplates
+                Exact "Not supported"
 
         let checkFrag (i: int) (f: TemplateFragmentEx) =
             match f with

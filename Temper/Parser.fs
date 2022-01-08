@@ -17,9 +17,10 @@ type PatternEx =
     | Optional of PatternEx
     | Star of PatternEx
     | Definition of ident: string
+    | Subtemplate of TemplateFragmentEx list
     | Auto
 
-type TemplateFragmentEx =
+and TemplateFragmentEx =
     | Comment of string
     | Raw of string
     | Discard of PatternEx
@@ -29,6 +30,8 @@ type TemplateFragmentEx =
 module Parser =
 
     let variableName = many1Chars2 (satisfy isAsciiUpper) (satisfy isLetter) <?> "Variable identifier"
+    
+    let parseSubtemplateFragment, parseSubtemplateFragmentRef = createParserForwardedToRef()
 
     let parsePattern : Parser<PatternEx, unit> =
 
@@ -48,6 +51,8 @@ module Parser =
             (pstring "auto" >>% Auto)
             <|> (pstring "restofline" >>% Regex @".*")
             <|> (pstring "ident" >>% Regex @"\w+")
+        let subtemplate =
+            between (pstring "<#") (pstring "#>") (many parseSubtemplateFragment) |>> Subtemplate
 
         let pattern, patternRef = createParserForwardedToRef()
 
@@ -61,6 +66,7 @@ module Parser =
                     variable
                     shorthands
                     whitespace
+                    subtemplate
                 ] "pattern"
 
         let specialPattern : Parser<PatternEx, unit> =
@@ -78,13 +84,19 @@ module Parser =
 
         pattern
 
-    let parseFragment : Parser<TemplateFragmentEx, unit> =
+    let parseFragment (isSubtemplate: bool) : Parser<TemplateFragmentEx, unit> =
 
         let raw = 
-            many1CharsTill
-                anyChar
-                (followedBy (pstring "%") <|> eof)
-             |>> Raw
+            if isSubtemplate then
+                many1CharsTill
+                    anyChar
+                    (followedBy (pstring "%" <|> pstring "#>"))
+                |>> Raw
+            else
+                many1CharsTill
+                    anyChar
+                    (followedBy (pstring "%") <|> eof)
+                |>> Raw
 
         let discard =
             between
@@ -123,7 +135,9 @@ module Parser =
                 raw
             ] "fragment"
 
+    do parseSubtemplateFragmentRef.Value <- parseFragment true
+
     let parseFragments str : Result<TemplateFragmentEx array, string> =
-        match run (many parseFragment) str with
+        match run (many (parseFragment false)) str with
         | ParserResult.Success (v, _, _) -> Result.Ok (Array.ofList v)
         | ParserResult.Failure (err, _, _) -> Result.Error err

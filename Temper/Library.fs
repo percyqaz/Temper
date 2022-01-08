@@ -39,6 +39,7 @@ module Reader =
             | Regex ex -> regex ex |>> String
             | Optional (pat, _) -> opt (patternParser pat fragAhead) |>> Option
             | Star (pat, _) -> many (patternParser pat fragAhead) |>> List
+            | Subtemplate _ -> failwith "not supported" 
             | Auto ->
                 match fragAhead with
                 | Some f -> (manyCharsTill anyChar (followedBy (fragParser f None)))
