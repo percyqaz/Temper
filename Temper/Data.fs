@@ -4,6 +4,7 @@
     Data layer - Handling the data that that is being mapped to/from templated text
 *)
 
+
 type VarType =
     | String
     | Option of VarType
@@ -16,17 +17,20 @@ type VarType =
         | List ty -> sprintf "List of %O" ty
         | Object ms -> "{ " + (Map.toSeq ms |> Seq.map (fun (k, vt) -> sprintf "%s: %O" k vt) |> String.concat "; ") + " }"
 
+type ObjectKind = string
+
 type VarValue =
     | String of string
     | Option of VarValue option
     | List of VarValue list
-    | Object of Map<string, VarValue>
+    // Objects store markers of their "kind" - This is the pattern they were parsed with, so it can be used to write them back
+    | Object of Map<string, VarValue> * ObjectKind
     override this.ToString() =
         match this with
         | String s -> sprintf "'%s'" s
         | Option opt -> match opt with None -> "null" | Some x -> x.ToString()
         | List ty -> "[ " + (ty |> Seq.map (sprintf "%O") |> String.concat "; ") + " ]"
-        | Object ms -> "{ " + (Map.toSeq ms |> Seq.map (fun (k, v) -> sprintf "%s = %O" k v) |> String.concat "; ") + " }"
+        | Object (ms, kind) -> kind + " { " + (Map.toSeq ms |> Seq.map (fun (k, v) -> sprintf "%s = %O" k v) |> String.concat "; ") + " }"
 
 type Vars = Map<string, VarValue>
 
@@ -82,7 +86,7 @@ module Var =
         | Type.Option ty, Value.Option (Some x) -> checkType ty x |> TypeCheckResult.bind "Error in option type"
         | Type.List _, Value.List [] -> Ok()
         | Type.List ty, Value.List (x :: xs) -> checkType ty x |> TypeCheckResult.bind "Error in list"
-        | Type.Object tms, Value.Object ms ->
+        | Type.Object tms, Value.Object (ms, _) ->
             Seq.choose
                 ( fun x ->
                     if ms.ContainsKey x then
@@ -105,13 +109,14 @@ module Var =
         member this.Item (key: string) =
             let parent = this.Get()
             match parent with
-            | Object ms ->
+            | Object (ms, kind) ->
                 {
                     Get = fun () -> Map.find key ms
-                    Set = fun v -> Map.add key v ms |> Object |> this.Set
+                    Set = fun v -> Object (Map.add key v ms, kind) |> this.Set
                 }
             | _ -> failwith "Must be an object value"
 
+        // todo: list indexing might get binned due to no sem-time bound checks
         member this.Item (i: int) =
             let parent = this.Get()
             match parent with

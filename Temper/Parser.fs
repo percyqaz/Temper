@@ -12,7 +12,7 @@ type PatternEx =
     | CaseInsensitive of string
     | Regex of string
     | Whitespace of Whitespaces
-    | Variable of ident: string
+    | Expr of Expr
     | Choice of PatternEx * PatternEx
     | Optional of PatternEx
     | Star of PatternEx
@@ -34,7 +34,7 @@ module Parser =
 
         let stringEscape = manyChars ((noneOf "\"\\\r\n") <|> (pstring "\\\"" >>% '"') <|> (pstring "\\\\" >>% '\\'))
 
-        let variable = variableName |>> Variable // todo: 'as' pattern
+        let variable = variableName |>> (Variable >> Expr) // todo: 'as' pattern
         let definition = pchar '#' >>. variableName |>> Definition
         let exact = between (pchar '"') (pchar '"') stringEscape |>> Exact
         let caseInsensitive = between (pstring "^\"") (pchar '"') stringEscape |>> CaseInsensitive

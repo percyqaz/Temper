@@ -10,7 +10,7 @@ type Reader = Parser<unit, Vars>
 module Reader =
 
     let private pstringAllowNewline (str: string) =
-        let parts = str.Split("\n") |> List.ofArray
+        let parts = str.Split "\n" |> List.ofArray
         let rec f xs : Parser<unit, _> =
             match xs with
             | x :: y :: xs -> skipString x .>> pchar '\n' .>> f (y :: xs)
@@ -27,11 +27,11 @@ module Reader =
             | Option (Some x) -> varParser x >>% v
             | List (x :: xs) -> varParser x .>> varParser (List xs) >>% v
             | List [] -> preturn v
-            | Object _ -> failwith "not supported"
+            | Object (ms, kind) -> failwith "not supported"
 
         let rec patternParser (m: PatternGuts) (fragAhead: TemplateFragment option) : Parser<VarValue, Vars> =
             match m with
-            | Variable v -> getUserState >>= (Map.find v >> varParser)
+            | Expr ex -> getUserState >>= (Expr.evaluate ex >> varParser)
             | Exact s -> pstring s |>> String
             | CaseInsensitive s -> pstringCI s |>> String
             | Whitespace _ -> skipped spaces |>> String

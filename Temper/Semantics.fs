@@ -50,7 +50,7 @@ module Semantics =
 
         let varDefs = Dictionary<string, VarType * bool>()
         let patternDefs = Dictionary<string, PatternGuts>()
-        
+
         // Works out if a pattern can generate a default value when writing
         // Used when writing discard fragments
         let rec inferDefaultFunc (m: PatternGuts) : PatternInferFunc =
@@ -72,7 +72,7 @@ module Semantics =
                     match inferDefaultFunc pat with
                     | F inner -> F (fun vars -> inner vars |> List.singleton |> List)
                     | err -> err
-            | Variable v -> F (fun vars -> Map.find v vars)
+            | Expr ex -> F (Expr.evaluate ex)
             | Choice (first, rest) ->
                 match inferDefaultFunc first with
                 | F f -> F f
@@ -90,9 +90,20 @@ module Semantics =
             | Auto -> VarType.String
             | Optional (pat, _) -> VarType.Option (inferPatternType i pat)
             | Star (pat, _) -> VarType.List (inferPatternType i pat)
-            | Variable v ->
-                if varDefs.ContainsKey v then fst varDefs.[v]
-                else crit i Variable.notFound (sprintf "The variable '%s' doesn't exist!" v)
+            | Expr ex ->
+                let rec checkExpr ex =
+                    match ex with
+                    | Expr.Variable v -> 
+                        if varDefs.ContainsKey v then fst varDefs.[v]
+                        else crit i Variable.notFound (sprintf "The variable '%s' doesn't exist!" v)
+                    | Expr.Property (ex, prop) ->
+                        match checkExpr ex with
+                        | VarType.Object ms ->
+                            if Map.containsKey prop ms then ms.[prop]
+                            else crit i Variable.notFound (sprintf "The property '%s' doesn't exist for this value!" prop)
+                        | _ -> crit i Variable.notFound (sprintf "This value is not an object, and is not subscriptable!")
+                    | Expr.ObjectCast _ -> failwith "nyi"
+                checkExpr ex
             | Choice (first, rest) ->
                 let firstType = inferPatternType i first
                 let restType = inferPatternType i rest
@@ -108,7 +119,7 @@ module Semantics =
         let mutable blockAutoFrag = -1
         let rec checkPatternEx (i: int) (m: PatternEx) : PatternGuts =
             match m with
-            | PatternEx.Variable v -> Variable v
+            | PatternEx.Expr v -> Expr v
             | PatternEx.Exact s -> Exact s
             | PatternEx.CaseInsensitive s -> CaseInsensitive s
             | PatternEx.Whitespace wd -> Whitespace wd
