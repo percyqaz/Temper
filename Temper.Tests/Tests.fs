@@ -125,3 +125,12 @@ module Patterns =
         exGoodRead r """World | World"""
         exBadRead r """HELLO | """
         exBadRead r """helloWorld | HelloWorld"""
+
+    [<Test>]
+    let Object () =
+        let r = getReaderExpectNoWarning """
+            %-#Obj = <# #> -%
+            % VAR: #Obj % | %: VAR -%
+            """
+
+        exBadRead r """Template text | Template text"""

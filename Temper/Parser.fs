@@ -29,30 +29,31 @@ and TemplateFragmentEx =
 
 module Parser =
 
+    let debug label p = p |>> (fun x -> printfn "Parsed %s: %A" label x; x)
+
     let variableName = many1Chars2 (satisfy isAsciiUpper) (satisfy isLetter) <?> "Variable identifier"
     
-    let parseSubtemplateFragment, parseSubtemplateFragmentRef = createParserForwardedToRef()
+    let parseSubtemplate, parseSubtemplateRef = createParserForwardedToRef()
 
     let parsePattern : Parser<PatternEx, unit> =
 
         let stringEscape = manyChars ((noneOf "\"\\\r\n") <|> (pstring "\\\"" >>% '"') <|> (pstring "\\\\" >>% '\\'))
 
-        let variable = variableName |>> (Variable >> Expr) // todo: 'as' pattern
-        let definition = pchar '#' >>. variableName |>> Definition
-        let exact = between (pchar '"') (pchar '"') stringEscape |>> Exact
         let caseInsensitive = between (pstring "^\"") (pchar '"') stringEscape |>> CaseInsensitive
+        let regex = between (pstring "r\"") (pchar '"') stringEscape |>> Regex
+        let exact = between (pchar '"') (pchar '"') stringEscape |>> Exact
+        let definition = pchar '#' >>. variableName |>> Definition
+        let subtemplate = between (pstring "<#") (pstring "#>") parseSubtemplate |>> Subtemplate
+        let variable = variableName |>> (Variable >> Expr) // todo: 'as' pattern
+        let shorthands =
+            (pstring "auto" >>% Auto)
+            <|> (pstring "restofline" >>% Regex @".*")
+            <|> (pstring "ident" >>% Regex @"\w+")
         let whitespace =
             (pstring "space" >>% Whitespace Space)
             <|> (pstring "tab" >>% Whitespace Tab)
             <|> (pstring "newline" >>% Whitespace Newline)
             <|> (pstring "ws" >>% Whitespace NoWhitespace)
-        let regex = between (pstring "r\"") (pchar '"') stringEscape |>> Regex
-        let shorthands =
-            (pstring "auto" >>% Auto)
-            <|> (pstring "restofline" >>% Regex @".*")
-            <|> (pstring "ident" >>% Regex @"\w+")
-        let subtemplate =
-            between (pstring "<#") (pstring "#>") (many parseSubtemplateFragment) |>> Subtemplate
 
         let pattern, patternRef = createParserForwardedToRef()
 
@@ -63,10 +64,10 @@ module Parser =
                     regex
                     exact
                     definition
+                    subtemplate
                     variable
                     shorthands
                     whitespace
-                    subtemplate
                 ] "Pattern"
 
         let specialPattern : Parser<PatternEx, unit> =
@@ -97,7 +98,7 @@ module Parser =
             (pstring (inner + "-%") .>> spaces)
             <|> pstring (inner + "%")
             <?> "Closing tag"
-
+            
         let raw = 
             attempt (spaces >>. followedBy (pstring "%-")) >>% ""
             <|>
@@ -106,7 +107,7 @@ module Parser =
                 (
                     attempt (spaces >>. followedBy (pstring "%-"))
                     <|> followedBy (pstring "%")
-                    <|> eof
+                    <|> (if isSubtemplate then followedBy (pstring "#>") else eof)
                 )
             |>> Raw
 
@@ -147,10 +148,9 @@ module Parser =
                 discard
                 variable
                 raw
-            ] "fragment"
+            ] "Fragment"
 
-    do parseSubtemplateFragmentRef.Value <- parseFragment true
-
+    do parseSubtemplateRef.Value <- manyTill (parseFragment true) (followedBy (pstring "#>"))
     let parseTemplate = many (parseFragment false)
 
     let parseFragments str : Result<TemplateFragmentEx array, string> =
