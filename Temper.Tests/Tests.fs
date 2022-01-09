@@ -115,10 +115,13 @@ module Patterns =
 
     [<Test>]
     let Definition () =
-        let r = getReaderExpectNoWarning """%# HelloWorlds = (^"Hello" | "World")* % %VAR: #HelloWorlds % ! %: VAR % """
+        let r = getReaderExpectNoWarning """
+            %-# HelloWorlds = (^"Hello" | "World")* -%
+            %- VAR: #HelloWorlds % | %: VAR -%
+            """
 
-        exGoodRead r """ HellohelloWorldHELLO ! HellohelloWorldHELLO """
-        exGoodRead r """  !  """
-        exGoodRead r """ World ! World """
-        exBadRead r """ HELLO ! """
-        exBadRead r """ helloWorld ! HelloWorld """
+        exGoodRead r """HellohelloWorldHELLO | HellohelloWorldHELLO"""
+        exGoodRead r """ | """
+        exGoodRead r """World | World"""
+        exBadRead r """HELLO | """
+        exBadRead r """helloWorld | HelloWorld"""

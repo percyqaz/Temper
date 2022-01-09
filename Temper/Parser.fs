@@ -67,7 +67,7 @@ module Parser =
                     shorthands
                     whitespace
                     subtemplate
-                ] "pattern"
+                ] "Pattern"
 
         let specialPattern : Parser<PatternEx, unit> =
             between (pchar '(' .>> spaces) (spaces >>. pchar ')') pattern <|> simplePattern >>=
@@ -86,43 +86,57 @@ module Parser =
 
     let parseFragment (isSubtemplate: bool) : Parser<TemplateFragmentEx, unit> =
 
+        // Tags & plain text fragments
+
+        let open_tag inner = 
+            pstring ("%-" + inner)
+            <|>pstring ("%" + inner)
+            <?> "Opening tag"
+
+        let close_tag inner = 
+            (pstring (inner + "-%") .>> spaces)
+            <|> pstring (inner + "%")
+            <?> "Closing tag"
+
         let raw = 
-            if isSubtemplate then
-                many1CharsTill
-                    anyChar
-                    (followedBy (pstring "%" <|> pstring "#>"))
-                |>> Raw
-            else
-                many1CharsTill
-                    anyChar
-                    (followedBy (pstring "%") <|> eof)
-                |>> Raw
+            attempt (spaces >>. followedBy (pstring "%-")) >>% ""
+            <|>
+            many1CharsTill
+                anyChar
+                (
+                    attempt (spaces >>. followedBy (pstring "%-"))
+                    <|> followedBy (pstring "%")
+                    <|> eof
+                )
+            |>> Raw
+
+        // Tag types
 
         let discard =
             between
-                (pstring "%:" .>> spaces)
-                (spaces >>. pstring "%")
+                (open_tag ":" .>> spaces)
+                (spaces >>. close_tag "")
                 parsePattern
             |>> Discard
 
         let variable =
             between
-                (pstring "%" >>. spaces)
-                (spaces >>. pstring "%")
+                (open_tag "" >>. spaces)
+                (spaces >>. close_tag "")
                 (variableName .>>. (opt (pchar ':' >>. spaces >>. parsePattern) |>> Option.defaultValue Auto))
             |>> Capture
 
         let comment =
             between
-                (pstring "%*")
-                (pstring "*%")
-                (manyCharsTill anyChar (followedBy (pstring "*%")))
+                (open_tag "*")
+                (close_tag "*")
+                (manyCharsTill anyChar (followedBy (close_tag "*")))
             |>> Comment
 
         let definition =
             between
-                (pstring "%#" >>. spaces)
-                (spaces >>. pstring "%")
+                (open_tag "#" >>. spaces)
+                (spaces >>. close_tag "")
                 (variableName .>>. (spaces >>. pchar '=' >>. spaces >>. parsePattern))
             |>> Define
 
@@ -137,7 +151,9 @@ module Parser =
 
     do parseSubtemplateFragmentRef.Value <- parseFragment true
 
+    let parseTemplate = many (parseFragment false)
+
     let parseFragments str : Result<TemplateFragmentEx array, string> =
-        match run (many (parseFragment false)) str with
+        match run (parseTemplate) str with
         | ParserResult.Success (v, _, _) -> Result.Ok (Array.ofList v)
         | ParserResult.Failure (err, _, _) -> Result.Error err

@@ -159,6 +159,7 @@ module Semantics =
         let checkFrag (i: int) (f: TemplateFragmentEx) =
             match f with
             | TemplateFragmentEx.Comment s -> None
+            | TemplateFragmentEx.Raw "" -> None
 
             | TemplateFragmentEx.Raw s -> Some (Raw s)
 
@@ -192,6 +193,8 @@ module Semantics =
                 if varDefs.ContainsKey d then 
                     warn i PatternDefinition.alreadyExists (sprintf "The pattern macro name '%s' has already been used!" d)
                 else patternDefs.Add(d, checkedPat)
+
+                // todo: if pattern macro is object, register object kind in template
 
                 None
 
