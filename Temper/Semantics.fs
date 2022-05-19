@@ -30,6 +30,10 @@ type TemplateWarning = Warning of fragPos: int * code: string * message: string
 
 exception TemplateError of fragPos: int * code: string * message: string
 
+type TemplateContext =
+    | Global
+    | Inner of unit // subtemplates aren't parameterised by the outer template yet, and may never be
+
 module Semantics =
     // need to check:
     // variables are not used before they are captured YEP
@@ -42,7 +46,7 @@ module Semantics =
     // analyse capture patterns for ambiguity/redundancy NYI
     // analyse anonymous patterns for defaultability YEP
 
-    let check (fragments: TemplateFragmentEx array) : Result<Template * TemplateWarning list, TemplateError> =
+    let check (ctx: TemplateContext) (fragments: TemplateFragmentEx array) : Result<Template * TemplateWarning list, TemplateError> =
 
         let warnings = ResizeArray<TemplateWarning>()
         let warn i code msg = warnings.Add (Warning (i, code, msg))
@@ -208,7 +212,6 @@ module Semantics =
                 { 
                     Body = List.ofArray checkedFrags
                     Variables = Map.ofSeq (varDefs |> Seq.map (|KeyValue|))
-                    Parameters = Map.empty
                 },
                 List.ofSeq warnings
             )

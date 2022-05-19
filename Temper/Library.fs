@@ -118,7 +118,7 @@ module Template =
     let fromString str =
         match Parser.parseFragments str with
         | Result.Ok frags ->
-            match Semantics.check frags with
+            match Semantics.check TemplateContext.Global frags with
             | Result.Ok (tmp, []) -> Ok tmp
             | Result.Ok (tmp, warnings) -> Warnings (tmp, warnings)
             | Result.Error err -> SemanticFail err

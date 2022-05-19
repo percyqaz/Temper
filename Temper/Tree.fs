@@ -65,16 +65,11 @@ and TemplateFragment =
     | Discard of Pattern
     | Capture of ident: string * Pattern
 
-and SubTemplate =
+and Template =
     {
         Body: TemplateFragment list
         Variables: Map<string, VarDefinition>
-        // todo: parameterise by outer template? will see if a use case comes up
+        //Parameters: Map<string, VarDefinition>
     }
 
-type Template =
-    {
-        Body: TemplateFragment list
-        Variables: Map<string, VarDefinition>
-        Parameters: Map<string, VarDefinition>
-    }
+and SubTemplate = Template // just for now
