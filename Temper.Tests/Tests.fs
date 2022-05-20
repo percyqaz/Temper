@@ -2,7 +2,7 @@ module Temper.Tests
 
 open NUnit.Framework
 open Temper
-open Temper.Data
+open Temper.Tree
 
 // Test categories to do:
 //  Parsing + Sem checks
@@ -17,23 +17,24 @@ let getReaderExpectNoWarning str =
     match Template.fromString str with
     | Ok tmp -> printfn "%A" tmp; tmp
     | x -> failwithf "Expected template parse with no warnings but got %A" x
-    |> Reader.build
+    |> Read.reader
 
-let reader = Reader.build
-let writer = Writer.build
-let read r str = match Reader.read r str with Result.Ok vars -> vars | Result.Error x -> failwithf "Expected successful read: %s" x
+let empty_ctx = { Variables = Map.empty; Macros = Map.empty } 
+//let reader = Reader.build
+//let writer = Writer.build
+let read r str = match Read.read r empty_ctx str with Result.Ok vars -> vars | Result.Error x -> failwithf "Expected successful read: %s" x
 
 let exGoodRead r str =
-    match Reader.read r str with
+    match Read.read r empty_ctx str with
     | Result.Ok vars -> printfn "%A" vars
     | Result.Error x -> failwithf "Expected successful read: %s" x
 
 let exBadRead r str =
-    match Reader.read r str with
+    match Read.read r empty_ctx str with
     | Result.Ok vars -> failwithf "Expected read to fail: %A" vars
     | Result.Error x -> printfn "%s" x
 
-let write = Writer.toString
+//let write = Writer.toString
 
 [<Test>]
 let Test1 () =
@@ -44,7 +45,7 @@ let Test1 () =
                 let % Ident: ident % = %: ModuleName | "()" %
             """
     Assert.AreEqual(
-        Map.ofList [("ModuleName", String "TestModule"); ("Ident", String "Hello")],
+        Map.ofList [("ModuleName", Val.Str "TestModule"); ("Ident", Val.Str "Hello")],
         read r 
             """
             module TestModule =
@@ -52,7 +53,7 @@ let Test1 () =
             """
     )
     Assert.AreEqual(
-        Map.ofList [("ModuleName", String "TestModule"); ("Ident", String "Hello")],
+        Map.ofList [("ModuleName", Val.Str "TestModule"); ("Ident", Val.Str "Hello")],
         read r 
             """
             module TestModule =

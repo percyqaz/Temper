@@ -1,31 +1,11 @@
-﻿namespace OLD
+﻿namespace Temper
 
 (*
     Parse layer - Parses a template to intermediary parse tree for semantic analysis
 *)
 
 open FParsec
-open OLD.Tree
-
-type PatternEx =
-    | Exact of string
-    | CaseInsensitive of string
-    | Regex of string
-    | Whitespace of Whitespaces
-    | Expr of Expr
-    | Choice of PatternEx * PatternEx
-    | Optional of PatternEx
-    | Star of PatternEx
-    | Definition of ident: string
-    | Subtemplate of TemplateFragmentEx list
-    | Auto
-
-and TemplateFragmentEx =
-    | Comment of string
-    | Raw of string
-    | Discard of PatternEx
-    | Capture of ident: string * PatternEx
-    | Define of ident: string * PatternEx
+open Temper.Tree
 
 module Parser =
 
@@ -35,29 +15,30 @@ module Parser =
     
     let parseSubtemplate, parseSubtemplateRef = createParserForwardedToRef()
 
-    let parsePattern : Parser<PatternEx, unit> =
+    let parsePattern : Parser<Pattern, unit> =
 
         let stringEscape = manyChars ((noneOf "\"\\\r\n") <|> (pstring "\\\"" >>% '"') <|> (pstring "\\\\" >>% '\\'))
 
-        let caseInsensitive = between (pstring "^\"") (pchar '"') stringEscape |>> CaseInsensitive
-        let regex = between (pstring "r\"") (pchar '"') stringEscape |>> Regex
-        let exact = between (pchar '"') (pchar '"') stringEscape |>> Exact
-        let definition = pchar '#' >>. variableName |>> Definition
-        let subtemplate = between (pstring "<#") (pstring "#>") parseSubtemplate |>> Subtemplate
-        let variable = variableName |>> (Variable >> Expr) // todo: 'as' pattern
+        let caseInsensitive = between (pstring "^\"") (pchar '"') stringEscape |>> Pattern.CaseInsensitive
+        let regex = between (pstring "r\"") (pchar '"') stringEscape |>> Pattern.Regex
+        let exact = between (pchar '"') (pchar '"') stringEscape |>> Pattern.Exact
+        let definition = pchar '#' >>. variableName |>> Pattern.Macro
+        let subtemplate = between (pstring "<#") (pstring "#>") parseSubtemplate |>> Pattern.Subtemplate
+        let variable = variableName |>> (Expr.Var >> Pattern.Expr)
         let shorthands =
-            (pstring "auto" >>% Auto)
-            <|> (pstring "restofline" >>% Regex @".*")
-            <|> (pstring "ident" >>% Regex @"\w+")
+            (pstring "auto" >>% Pattern.Auto)
+            // todo: move these to built-in macros
+            //<|> (pstring "restofline" >>% Pattern.Regex @".*")
+            //<|> (pstring "ident" >>% Pattern.Regex @"\w+")
         let whitespace =
-            (pstring "space" >>% Whitespace Space)
-            <|> (pstring "tab" >>% Whitespace Tab)
-            <|> (pstring "newline" >>% Whitespace Newline)
-            <|> (pstring "ws" >>% Whitespace NoWhitespace)
+            (pstring "space" >>% Pattern.Whitespace Whitespace.Space)
+            <|> (pstring "tab" >>% Pattern.Whitespace Whitespace.Tab)
+            <|> (pstring "nl" >>% Pattern.Whitespace Whitespace.Newline)
+            <|> (pstring "ws" >>% Pattern.Whitespace Whitespace.None)
 
         let pattern, patternRef = createParserForwardedToRef()
 
-        let simplePattern : Parser<PatternEx, unit> =
+        let simplePattern : Parser<Pattern, unit> =
             choiceL
                 [
                     caseInsensitive
@@ -70,28 +51,28 @@ module Parser =
                     whitespace
                 ] "Pattern"
 
-        let specialPattern : Parser<PatternEx, unit> =
+        let specialPattern : Parser<Pattern, unit> =
             between (pchar '(' .>> spaces) (spaces >>. pchar ')') pattern <|> simplePattern >>=
             ( fun pat ->
-                (pchar '?' >>% Optional pat)
-                <|> (pchar '*' >>% Star pat)
+                (pchar '*' >>% Pattern.Star pat)
+                //<|> (pchar '?' >>% Optional pat)
                 <|> preturn pat
             )
 
         patternRef.Value <-
             specialPattern
             .>>. (opt (attempt (spaces >>. pchar '|' >>. spaces) >>. pattern))
-            |>> function (head, Some rest) -> Choice (head, rest) | (head, None) -> head
+            |>> function (head, Some rest) -> Pattern.Choice (head, rest) | (head, None) -> head
 
         pattern
 
-    let parseFragment (isSubtemplate: bool) : Parser<TemplateFragmentEx, unit> =
+    let parseFragment (isSubtemplate: bool) : Parser<Frag, unit> =
 
         // Tags & plain text fragments
 
         let open_tag inner = 
             pstring ("%-" + inner)
-            <|>pstring ("%" + inner)
+            <|> pstring ("%" + inner)
             <?> "Opening tag"
 
         let close_tag inner = 
@@ -109,7 +90,7 @@ module Parser =
                     <|> followedBy (pstring "%")
                     <|> (if isSubtemplate then followedBy (pstring "#>") else eof)
                 )
-            |>> Raw
+            |>> Frag.Pure
 
         // Tag types
 
@@ -118,28 +99,28 @@ module Parser =
                 (open_tag ":" .>> spaces)
                 (spaces >>. close_tag "")
                 parsePattern
-            |>> Discard
+            |>> Frag.Discard
 
         let variable =
             between
                 (open_tag "" >>. spaces)
                 (spaces >>. close_tag "")
-                (variableName .>>. (opt (pchar ':' >>. spaces >>. parsePattern) |>> Option.defaultValue Auto))
-            |>> Capture
+                (variableName .>>. (opt (pchar ':' >>. spaces >>. parsePattern) |>> Option.defaultValue Pattern.Auto))
+            |>> Frag.Capture
 
         let comment =
             between
                 (open_tag "*")
                 (close_tag "*")
                 (manyCharsTill anyChar (followedBy (close_tag "*")))
-            |>> Comment
+            |>> Frag.Comment
 
         let definition =
             between
                 (open_tag "#" >>. spaces)
                 (spaces >>. close_tag "")
                 (variableName .>>. (spaces >>. pchar '=' >>. spaces >>. parsePattern))
-            |>> Define
+            |>> Frag.Define_Macro
 
         choiceL
             [
@@ -150,10 +131,10 @@ module Parser =
                 raw
             ] "Fragment"
 
-    do parseSubtemplateRef.Value <- manyTill (parseFragment true) (followedBy (pstring "#>"))
-    let parseTemplate = many (parseFragment false)
+    do parseSubtemplateRef.Value <- manyTill (parseFragment true) (followedBy (pstring "#>")) |>> fun fs -> { Body = fs }
+    let parseTemplate = many (parseFragment false) .>> eof
 
-    let parseFragments str : Result<TemplateFragmentEx array, string> =
-        match run (parseTemplate) str with
-        | ParserResult.Success (v, _, _) -> Result.Ok (Array.ofList v)
+    let parseFragments str : Result<Frag list, string> =
+        match run parseTemplate str with
+        | ParserResult.Success (v, _, _) -> Result.Ok v
         | ParserResult.Failure (err, _, _) -> Result.Error err

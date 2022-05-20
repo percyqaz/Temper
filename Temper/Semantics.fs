@@ -1,12 +1,12 @@
-﻿namespace Temper
+﻿namespace OLD
 
 (*
     Semantic check layer - Verifies the meaning & validity of a template before it can be used.
 *)
 
 open System.Collections.Generic
-open Temper.Data
-open Temper.Tree
+open OLD.Data
+open OLD.Tree
 
 module WarningCode =
     module Variable =

@@ -1,10 +1,10 @@
-﻿namespace Temper
+﻿namespace _Temper
 
 open System.IO
 open FParsec
-open Temper
-open Temper.Data
-open Temper.Tree
+open OLD
+open OLD.Data
+open OLD.Tree
 
 type Reader = Parser<unit, Vars>
 module Reader =
