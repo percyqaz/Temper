@@ -15,7 +15,16 @@ module Parser =
     
     let parseSubtemplate, parseSubtemplateRef = createParserForwardedToRef()
 
+    let parseExpr : Parser<Expr, unit> =
+        let variable = variableName |>> Expr.Var
+        let it = stringReturn "it" Expr.It
+        let prop = "nyi"
+
+        choiceL [variable; it] "Expression"
+
     let parsePattern : Parser<Pattern, unit> =
+
+        let pattern, patternRef = createParserForwardedToRef()
 
         let stringEscape = manyChars ((noneOf "\"\\\r\n") <|> (pstring "\\\"" >>% '"') <|> (pstring "\\\\" >>% '\\'))
 
@@ -24,7 +33,9 @@ module Parser =
         let exact = between (pchar '"') (pchar '"') stringEscape |>> Pattern.Exact
         let definition = pchar '#' >>. variableName |>> Pattern.Macro
         let subtemplate = between (pstring "<#") (pstring "#>") parseSubtemplate |>> Pattern.Subtemplate
-        let variable = variableName |>> (Expr.Var >> Pattern.Expr)
+        let str_expr = between (pchar '<') (pchar '>') parseExpr |>> Pattern.String_Expr
+        let list_expr = between (pchar '[') (pchar ']') (parseExpr .>> spaces .>> pchar '|' .>> spaces .>>. pattern) |>> Pattern.List_Expr
+        let obj_expr = between (pchar '{') (pchar '}') (parseExpr .>> spaces .>> pchar '|' .>> spaces .>>. pattern) |>> Pattern.Obj_Expr
         let shorthands =
             (pstring "auto" >>% Pattern.Auto)
             // todo: move these to built-in macros
@@ -36,8 +47,6 @@ module Parser =
             <|> (pstring "nl" >>% Pattern.Whitespace Whitespace.Newline)
             <|> (pstring "ws" >>% Pattern.Whitespace Whitespace.None)
 
-        let pattern, patternRef = createParserForwardedToRef()
-
         let simplePattern : Parser<Pattern, unit> =
             choiceL
                 [
@@ -46,7 +55,9 @@ module Parser =
                     exact
                     definition
                     subtemplate
-                    variable
+                    str_expr
+                    list_expr
+                    obj_expr
                     shorthands
                     whitespace
                 ] "Pattern"

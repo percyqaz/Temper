@@ -15,24 +15,24 @@ let Setup () =
 
 let getReaderExpectNoWarning str =
     match Template.fromString str with
-    | Ok tmp -> printfn "%A" tmp; tmp
+    | Ok tmp -> printfn "Template info -- %A" tmp; tmp
     | x -> failwithf "Expected template parse with no warnings but got %A" x
     |> Read.reader
 
-let empty_ctx = { Variables = Map.empty; Macros = Map.empty } 
+let empty_ctx = Context.Empty
 //let reader = Reader.build
 //let writer = Writer.build
 let read r str = match Read.read r empty_ctx str with Result.Ok vars -> vars | Result.Error x -> failwithf "Expected successful read: %s" x
 
 let exGoodRead r str =
     match Read.read r empty_ctx str with
-    | Result.Ok vars -> printfn "%A" vars
+    | Result.Ok vars -> printfn "Good read -- %A" vars
     | Result.Error x -> failwithf "Expected successful read: %s" x
 
 let exBadRead r str =
     match Read.read r empty_ctx str with
     | Result.Ok vars -> failwithf "Expected read to fail: %A" vars
-    | Result.Error x -> printfn "%s" x
+    | Result.Error x -> printfn "Intended error -- %s" x
 
 //let write = Writer.toString
 
@@ -66,7 +66,7 @@ module Patterns =
 
     [<Test>]
     let ExactString () =
-        let r = getReaderExpectNoWarning """ %VAR:"HelloWorld"% World %:VAR% """
+        let r = getReaderExpectNoWarning """ %VAR:"HelloWorld"% World %:<VAR>% """
 
         exGoodRead r """ HelloWorld World HelloWorld """
         exBadRead r """ HelloWorld World . """
@@ -76,7 +76,7 @@ module Patterns =
 
     [<Test>]
     let CIString () =
-        let r = getReaderExpectNoWarning """ %VAR:^"Hello"% World %:VAR% """
+        let r = getReaderExpectNoWarning """ %VAR:^"Hello"% World %:<VAR>% """
 
         exGoodRead r """ hello World hello """
         exGoodRead r """ Hello World Hello """
@@ -86,7 +86,7 @@ module Patterns =
 
     [<Test>]
     let Regex () =
-        let r = getReaderExpectNoWarning """ %VAR:r"[a-z.]*"% X %:VAR% """
+        let r = getReaderExpectNoWarning """ %VAR:r"[a-z.]*"% X %:<VAR>% """
 
         exGoodRead r """ hello X hello """
         exGoodRead r """ zoo.wee.mama X zoo.wee.mama """
@@ -96,7 +96,7 @@ module Patterns =
 
     [<Test>]
     let Optional () =
-        let r = getReaderExpectNoWarning """ %VAR:"Hello"?% World %:VAR% """
+        let r = getReaderExpectNoWarning """ %VAR:"Hello"?% World %:<VAR>% """
 
         exGoodRead r """ Hello World Hello """
         exGoodRead r """  World  """
@@ -106,7 +106,7 @@ module Patterns =
 
     [<Test>]
     let List () =
-        let r = getReaderExpectNoWarning """ %VAR:"Hello"*%World%:VAR% """
+        let r = getReaderExpectNoWarning """ %VAR:"Hello"*%World%:[VAR|<it>]% """
 
         exGoodRead r """ HelloHelloHelloWorldHelloHelloHello """
         exGoodRead r """ HelloWorldHello """
@@ -118,7 +118,7 @@ module Patterns =
     let Definition () =
         let r = getReaderExpectNoWarning """
             %-# HelloWorlds = (^"Hello" | "World")* -%
-            %- VAR: #HelloWorlds % | %: VAR -%
+            %- VAR: #HelloWorlds % | %: [VAR|<it>] -%
             """
 
         exGoodRead r """HellohelloWorldHELLO | HellohelloWorldHELLO"""
@@ -130,8 +130,12 @@ module Patterns =
     [<Test>]
     let Object () =
         let r = getReaderExpectNoWarning """
-            %-#Obj = <# #> -%
-            % VAR: #Obj % | %: VAR -%
+            %-#Obj = <#let %N-% = %-V-%#> -%
+            %-#ObjR = <#let %:<N>-% = %-:<V>-%#> -%
+            % VAR: #Obj % | %: {VAR|#ObjR} -%
             """
 
-        exBadRead r """Template text | Template text"""
+        exGoodRead r """let x = y | let x = y"""
+        exGoodRead r """let 12345 = 0 | let 12345 = 0"""
+        exBadRead r """let 5 = 1 | let 5 = 0"""
+        exBadRead r """let 5 = | let 5 = 0"""
